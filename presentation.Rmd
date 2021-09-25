@@ -36,7 +36,7 @@ options(htmltools.dir.version = FALSE)
 
 # Open source geometry on the sphere using s2geometry and R
 
-### Dewey Dunnington and Edzer Pebezma
+### Dewey Dunnington and Edzer Pebesma
 
 ### 2021-09-30
 

@@ -61,6 +61,7 @@ plot_round <- function(x, ..., lat = 0) {
   }
   
   s2plot_default_par <- list(mai = rep(0, 4), fg = "white", bg = bg, col.axis = "white")
+  exprs <- rlang::enquos(...)
   
   withr::with_par(s2plot_default_par, {
     for (lon in seq(0, -360, length.out = 201)[frame_subset]) {
@@ -75,7 +76,8 @@ plot_round <- function(x, ..., lat = 0) {
         projection = pj,
         add = TRUE
       )
-      force(list(...))
+      
+      lapply(exprs, rlang::eval_tidy)
 
       wk::wk_plot(wk::crc(0, 0, r = 1), border = "grey70", add = T)
     }
@@ -95,19 +97,20 @@ options(htmltools.dir.version = FALSE)
 
 <!-- this is actually the title slide --->
 
-# Open source geometry on the sphere using s2geometry and R
+# Open source geometry on the sphere using s2geometry
 
-### Dewey Dunnington and Edzer Pebesma
+### Dewey Dunnington<sup>1</sup> and Edzer Pebesma<sup>2</sup>
 
-### 2021-09-30
+<br />
+<br />
+<br />
+
+<sup>1</sup>Fisheries and Oceans Canada<br />
+<sup>2</sup>Institute for Geoinformatics, University of Münster
 
 <!-- this is how you get the parliament hill blue thing on your slide  --->
 .landscape[
 
-]
-
-.footnote[
-Fisheries and Oceans Canada
 ]
 
 ---
@@ -115,7 +118,7 @@ class: inverse, center, middle
 
 # Your data is this:
 
-### longitude: -63.56, latitude: 45.11 ...
+### longitude: -63.56 ..., latitude: 45.11 ...
 
 ---
 class: inverse, center, middle
@@ -178,7 +181,7 @@ class: inverse, center, middle
 # Your bounding box is not this:
 
 ```{r bbox-flat}
-plot_flat(countries_sf, wk::rct(-180, 51, 180, 72))
+plot_flat(countries_sf, wk::wk_plot(wk::rct(-180, 51, 180, 72), add = TRUE))
 ```
 
 ---
@@ -215,23 +218,74 @@ plot_round(
 ```
 
 ---
-class: center
+class: inverse, center, middle
+
+# or this:
+
+```{r bbox-round-cap, animation.hook='gifski', interval = 1 / 25}
+alaska_cap <- alaska_s2 %>% 
+  s2_bounds_cap()
+alaska_cap_geog <- s2_geog_point(alaska_cap$lng, alaska_cap$lat) %>% 
+  s2_buffer_cells(alaska_cap$angle * pi / 180, radius = 1) %>% 
+  s2_simplify(0.001, radius = 1)
+
+plot_round(
+  countries_s2,
+  s2plot(alaska_cap_geog, col = rgb(1, 1, 1, 0.5), border = NA, add = T),
+  lat = 75
+)
+```
+
+---
 
 # s2geometry
 
-s2geometry (<https://s2geometry.io>) is an open-source spherical geometry engine and indexing system created and supported by Google
+- s2geometry (<https://s2geometry.io>) is an open-source spherical geometry engine and indexing system created and supported by Google
 
-The R package **s2** provides flexible R bindings for s2geometry using an interface similar to PostGIS and BigQuery Geography
+- The R package **s2** provides flexible R bindings for s2geometry using an interface similar to PostGIS and BigQuery Geography
 
-As of **sf** version 1.0.0, s2geometry is the default engine for geodetic coordinates
-
----
-
-# Using s2 in R
+- As of **sf** version 1.0.0, s2geometry is the default engine for geodetic coordinates
 
 ---
 
-# Using s2 in R
+# Using s2 in R via s2
+
+```{r, echo = TRUE}
+library(s2) # install.packages("s2")
+
+cities <- as_s2_geography(s2_data_tbl_cities$geometry)
+city_names <- s2_data_tbl_cities$name
+canada <- s2_data_countries("Canada")
+
+city_names[s2_intersects(cities, canada)]
+```
+
+---
+
+# Using s2 in R via sf
+
+```{r, echo = TRUE}
+# good example?
+```
+
+---
+
+# Challenges
+
+```{r, echo = TRUE, error = TRUE}
+nc <- read_sf(system.file("gpkg/nc.gpkg", package = "sf"))
+nc %>% st_combine() %>% st_union()
+```
+
+---
+
+# Acknowledgements
+
+- s2geometry authors: Eric Veach, Jesse Rosenstock
+
+- Fisheries and Oceans Canada: Clark Richards, Blair Greenan
+
+- Edzer Pebesma for roping me into all of this!
 
 ---
 

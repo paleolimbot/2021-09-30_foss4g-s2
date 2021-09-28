@@ -103,7 +103,6 @@ options(htmltools.dir.version = FALSE)
 
 <br />
 <br />
-<br />
 
 <sup>1</sup>Fisheries and Oceans Canada<br />
 <sup>2</sup>Institute for Geoinformatics, University of Münster

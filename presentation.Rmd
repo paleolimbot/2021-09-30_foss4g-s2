@@ -20,7 +20,68 @@ output:
 class: theme-xaringan-title-slide, center, middle
 
 ```{r setup, include=FALSE}
-# library(stuff)
+library(sf)
+library(s2)
+library(s2plot)
+
+if (!dir.exists("ne_countries")) {
+  curl::curl_download(
+    "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+    "ne_110m_admin_0_countries.zip"
+  )
+  dir.create("ne_countries")
+  unzip("ne_110m_admin_0_countries.zip", exdir = "ne_countries")
+  unlink("ne_110m_admin_0_countries.zip")
+}
+
+countries_s2 <- s2_data_countries()
+countries_sf <- read_sf("ne_countries/ne_110m_admin_0_countries.shp") %>% 
+  st_geometry() %>% 
+  st_set_crs(NA)
+
+
+
+plot_flat <- function(x, ...) {
+  default_par <- list(mai = rep(0.5, 4), fg = "white", bg = "#26374a", col.axis = "white")
+  withr::with_par(default_par, {
+    wk::wk_plot(x)
+    force(list(...))
+  })
+  invisible(NULL)
+}
+
+plot_round <- function(x, ..., lat = 0) {
+  # hack to get preview and knit versions working
+  if (!isTRUE(getOption("rstudio.notebook.executing"))) {
+    bg <- NA
+    frame_subset <- -1
+  } else {
+    bg <- "#26374a"
+    frame_subset <- 1
+  }
+  
+  s2plot_default_par <- list(mai = rep(0, 4), fg = "white", bg = bg, col.axis = "white")
+  
+  withr::with_par(s2plot_default_par, {
+    for (lon in seq(0, -360, length.out = 201)[frame_subset]) {
+      pj <- s2plot_projection_orthographic(sprintf("POINT (%s %s)", lon, lat))
+      pj_env <- s2plot:::last_projection_env
+      pj_env$last_projection <- pj
+      
+      plot(double(), double(), xlim = c(-1, 1), ylim = c(-1, 1), asp = 1, axes = FALSE)
+      s2plot(
+        x,
+        col = NA, border = "white", 
+        projection = pj,
+        add = TRUE
+      )
+      force(list(...))
+
+      wk::wk_plot(wk::crc(0, 0, r = 1), border = "grey70", add = T)
+    }
+  })
+  invisible(NULL)
+}
 
 knitr::opts_chunk$set(
   dpi = 200,
@@ -45,48 +106,132 @@ options(htmltools.dir.version = FALSE)
 
 ]
 
----
-
-# Slide and content
-
-Here is some content and a plot
-
-```{r, echo=FALSE}
-hist(faithful$waiting)
-```
-
-
 .footnote[
-No geysers were harmed in the making of this slide.
-]
-
----
-
-# Slide with left/right cols
-
-.pull-left[
-
-- Point one
-- Point two
-- Point three
-- Point four
-
-]
-
-.pull-right[
-
-You can put RMarkdown content here too:
-
-```{r, echo=TRUE, fig.width=4, fig.height=4}
-plot(1:5)
-```
-
+Fisheries and Oceans Canada
 ]
 
 ---
 class: inverse, center, middle
 
-# Section header slide
+# Your data is this:
+
+### longitude: -63.56, latitude: 45.11 ...
+
+---
+class: inverse, center, middle
+
+# ...but the world is not this:
+
+```{r countries-flat}
+plot_flat(countries_sf)
+```
+
+---
+class: inverse, center, middle
+
+# it's this:
+
+```{r countries-round, animation.hook='gifski', interval = 1 / 25}
+plot_round(countries_s2)
+```
+
+---
+class: inverse, center, middle
+
+# Your question is this:
+
+### Which {something} is within 500 km of land?
+
+---
+class: inverse, center, middle
+
+# ...but the answer is not this:
+
+```{r buffer-flat}
+# 500 km is ~5 degrees at the equator
+countries_sf_buffer <- countries_sf %>%
+  st_combine() %>% 
+  st_union() %>%
+  st_buffer(5)
+
+
+plot_flat(countries_sf_buffer)
+```
+
+---
+class: inverse, center, middle
+
+# it's this:
+
+```{r buffer-round, animation.hook='gifski', interval = 1 / 25}
+countries_s2_buffer <- countries_s2 %>% 
+  s2_coverage_union_agg(s2_options(snap = s2_snap_level(15))) %>% 
+  s2_buffer_cells(500000, min_level = 8) %>% 
+  s2_rebuild(s2_options(snap = s2_snap_level(15)))
+
+plot_round(countries_s2_buffer)
+```
+
+---
+class: inverse, center, middle
+
+# Your bounding box is not this:
+
+```{r bbox-flat}
+plot_flat(countries_sf, wk::rct(-180, 51, 180, 72))
+```
+
+---
+class: inverse, center, middle
+
+# it's this:
+
+```{r bbox-round, animation.hook='gifski', interval = 1 / 25}
+alaska_bbox_seg <- wk::rct(-180, 51, 180, 72) %>% 
+  st_as_sfc() %>% 
+  st_segmentize(1)
+
+alaska_s2 <- s2_data_countries("United States of America") %>% 
+  s2_intersection(alaska_bbox_seg)
+
+alaska_bbox_s2 <- alaska_s2 %>% 
+  s2_buffer_cells(0, max_cells = 4) %>%
+  wk::as_wkb() %>%
+  wk::wk_handle(
+    s2::s2_unprojection_filter(
+      s2::s2_projection_filter(
+        tessellate_tol = 0.0001,
+        wk::wkb_writer()
+      )
+    )
+  ) %>% 
+  as_s2_geography()
+
+plot_round(
+  countries_s2,
+  s2plot(alaska_bbox_s2, col = rgb(1, 1, 1, 0.5), border = NA, add = T),
+  lat = 75
+)
+```
+
+---
+class: center
+
+# s2geometry
+
+s2geometry (<https://s2geometry.io>) is an open-source spherical geometry engine and indexing system created and supported by Google
+
+The R package **s2** provides flexible R bindings for s2geometry using an interface similar to PostGIS and BigQuery Geography
+
+As of **sf** version 1.0.0, s2geometry is the default engine for geodetic coordinates
+
+---
+
+# Using s2 in R
+
+---
+
+# Using s2 in R
 
 ---
 

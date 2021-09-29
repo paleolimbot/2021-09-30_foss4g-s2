@@ -34,7 +34,8 @@ if (!dir.exists("ne_countries")) {
   unlink("ne_110m_admin_0_countries.zip")
 }
 
-countries_s2 <- s2_data_countries()
+countries_s2 <- s2_data_countries() %>% 
+  s2_union(options = s2_options(snap = s2_snap_level(14)))
 countries_sf <- read_sf("ne_countries/ne_110m_admin_0_countries.shp") %>% 
   st_geometry() %>% 
   st_set_crs(NA)
@@ -44,7 +45,8 @@ countries_sf <- read_sf("ne_countries/ne_110m_admin_0_countries.shp") %>%
 plot_flat <- function(x, ...) {
   default_par <- list(mai = rep(0.5, 4), fg = "white", bg = "#26374a", col.axis = "white")
   withr::with_par(default_par, {
-    wk::wk_plot(x)
+    plot(double(), double(), xlim = c(-180, 180), ylim = c(-90, 90), asp = 1)
+    wk::wk_plot(x, add = T)
     force(list(...))
   })
   invisible(NULL)
@@ -101,8 +103,7 @@ options(htmltools.dir.version = FALSE)
 
 ### Dewey Dunnington<sup>1</sup> and Edzer Pebesma<sup>2</sup>
 
-<br />
-<br />
+<https://fishandwhistle.net/slides/s22021>
 
 <sup>1</sup>Fisheries and Oceans Canada<br />
 <sup>2</sup>Institute for Geoinformatics, University of Münster
@@ -157,7 +158,7 @@ countries_sf_buffer <- countries_sf %>%
   st_buffer(5)
 
 
-plot_flat(countries_sf_buffer)
+plot_flat(countries_sf_buffer, wk::wk_plot(countries_sf, border = "grey80", add = T))
 ```
 
 ---
@@ -171,7 +172,7 @@ countries_s2_buffer <- countries_s2 %>%
   s2_buffer_cells(500000, min_level = 8) %>% 
   s2_rebuild(s2_options(snap = s2_snap_level(15)))
 
-plot_round(countries_s2_buffer)
+plot_round(countries_s2_buffer, s2plot(countries_s2, border = "grey80", add = T))
 ```
 
 ---
@@ -180,7 +181,7 @@ class: inverse, center, middle
 # Your bounding box is not this:
 
 ```{r bbox-flat}
-plot_flat(countries_sf, wk::wk_plot(wk::rct(-180, 51, 180, 72), add = TRUE))
+plot_flat(wk::rct(-180, 51, 180, 72), wk::wk_plot(countries_sf, border = "grey80", add = TRUE))
 ```
 
 ---
@@ -210,8 +211,8 @@ alaska_bbox_s2 <- alaska_s2 %>%
   as_s2_geography()
 
 plot_round(
-  countries_s2,
-  s2plot(alaska_bbox_s2, col = rgb(1, 1, 1, 0.5), border = NA, add = T),
+  alaska_bbox_s2,
+  s2plot(countries_s2, border = "grey80", add = T),
   lat = 75
 )
 ```
@@ -229,8 +230,8 @@ alaska_cap_geog <- s2_geog_point(alaska_cap$lng, alaska_cap$lat) %>%
   s2_simplify(0.001, radius = 1)
 
 plot_round(
-  countries_s2,
-  s2plot(alaska_cap_geog, col = rgb(1, 1, 1, 0.5), border = NA, add = T),
+  alaska_cap_geog,
+  s2plot(countries_s2, border = "grey80", add = T),
   lat = 75
 )
 ```
@@ -264,7 +265,13 @@ city_names[s2_intersects(cities, canada)]
 # Using s2 in R via sf
 
 ```{r, echo = TRUE}
-# good example?
+library(sf)
+
+cities <- st_as_sfc(s2_data_cities())
+city_names <- s2_data_tbl_cities$name
+canada <- st_as_sfc(s2_data_countries("Canada"))
+
+city_names[as.matrix(st_intersects(cities, canada))]
 ```
 
 ---
@@ -275,6 +282,46 @@ city_names[s2_intersects(cities, canada)]
 nc <- read_sf(system.file("gpkg/nc.gpkg", package = "sf"))
 nc %>% st_combine() %>% st_union()
 ```
+
+---
+
+# Challenges
+
+```{r, echo = TRUE}
+system.time(s2_union_agg(s2_data_countries()))
+```
+
+```{r, echo = TRUE}
+system.time(
+  s2_dwithin_matrix(
+    rep(s2_data_cities(), 10),
+    s2_data_countries(),
+    100000
+  )
+)
+```
+
+---
+
+# Challenges
+
+```{r, echo = TRUE, error = TRUE}
+s2_segmentize()
+s2_buffer()
+s2_wrap_dateline()
+```
+
+---
+
+# Challenges
+
+```{cpp11, eval=FALSE}
+#include <s2_c.h>
+```
+
+    fatal error: 's2_c.h' file not found
+    #include <s2_c.h>
+             ^~~~~~~~
 
 ---
 
@@ -289,6 +336,16 @@ nc %>% st_combine() %>% st_union()
 ---
 
 # Questions?
+
+s2 on GitHub: <https://github.com/r-spatial/s2>
+
+s2geometry: <https://s2geometry.io>
+
+@paleolimbot, @edzerpebesma on Twitter
+
+@paleolimbot, @edzer on GitHub
+
+These slides: <https://fishandwhistle.net/slides/s22021>
 
 .landscape[
 

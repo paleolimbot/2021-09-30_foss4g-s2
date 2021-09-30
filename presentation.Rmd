@@ -315,6 +315,18 @@ s2_wrap_dateline()
 
 # Challenges
 
+* `st_buffer()` uses `s2_buffer_cells()`, which is a cell approximation that includes the true buffer, but what is a good number of cells?
+* In many cases, `st_buffer()` followed by `st_intersects()` is used to select features within a certain distance of another feature; but on S2, `st_is_within_distance()` is exact and much faster!
+* A recurring problem seems bounding box intersections, where users expect straight lines in R2 (Plate Carree), and not geodesics / great circles as in S2
+* Transforming lines and polygons back from S2 to Plate Carree is still hard (cut dateline, stretch poles)
+* A list of open issues: https://github.com/r-spatial/sf/issues/1771
+* When will QGIS, PostGIS, GRASS (?), and so on, adopt spherical/ellipsoidal geometry ops?
+* What is going on with OGC's simple feature standard?
+
+---
+
+# Challenges
+
 ```{cpp11, eval=FALSE}
 #include <s2_c.h>
 ```
